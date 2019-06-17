@@ -1,0 +1,8 @@
+topologies/*
+!topologies/config-2/
+.history
+.vscode
+deploy
+deploy-topology.yaml
+package-lock.json
+package.json

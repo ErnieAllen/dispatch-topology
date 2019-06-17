@@ -308,8 +308,8 @@ class Manager(object):
         links = request["links"]
         topology = request["topology"]
         settings = request["settings"]
-        http_port = settings.get('http_port', 5675)
-        listen_port = settings.get('internal_port', 2000)
+        http_port = int(settings.get('http_port', 5675))
+        listen_port = int(settings.get('internal_port', 2000))
         default_host = settings.get('default_host', '0.0.0.0')
 
         if nodeIndex and nodeIndex >= len(nodes):
@@ -413,11 +413,12 @@ class HttpHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def do_GET(self):
         SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self);
 
-    # use PORT requests to send commands
+    # use POST requests to send commands
     def do_POST(self):
         content_len = int(self.headers.getheader('content-length', 0))
         if content_len > 0:
             body = self.rfile.read(content_len)
+            self.log_message(str(body));
             data = json.loads(body)
             response = self.server.manager.operation(data['operation'], data)
             if response is not None:

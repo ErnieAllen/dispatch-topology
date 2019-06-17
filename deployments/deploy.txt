@@ -1,0 +1,19 @@
+
+PLAY [deploy_routers] **********************************************************
+
+TASK [Gathering Facts] *********************************************************
+ok: [0.0.0.0]
+
+TASK [install Dispatch Router] *************************************************
+ok: [0.0.0.0] => (item=[u'qpid-dispatch-router', u'qpid-dispatch-tools'])
+
+TASK [prepare to install console] **********************************************
+ok: [0.0.0.0]
+
+TASK [archive the console] *****************************************************
+fatal: [0.0.0.0 -> localhost]: FAILED! => {"changed": false, "msg": "path standalone.zip does not exist", "path": "standalone.zip", "state": "absent"}
+	to retry, use: --limit @/home/eallen/workspace/dispatch-topology/deployments/install_dispatch.retry
+
+PLAY RECAP *********************************************************************
+0.0.0.0                    : ok=3    changed=0    unreachable=0    failed=1   
+
