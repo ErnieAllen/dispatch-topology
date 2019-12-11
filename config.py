@@ -33,6 +33,7 @@ import yaml
 import threading
 import subprocess
 from distutils.spawn import find_executable
+import pdb;
 
 get_class = lambda x: globals()[x]
 sectionKeys = {"log": "module", "sslProfile": "name", "connector": "port", "listener": "port", "address": "prefix|pattern"}
@@ -224,7 +225,7 @@ class Manager(object):
                 if section:
                     if section.type == "router":
                         node["index"] = index
-                        node["nodeType"] = unicode("inter-router")
+                        node["nodeType"] = "edge" if section.entries["mode"] == "edge" else unicode("inter-router")
                         node["name"] = section.entries["id"]
                         node["key"] = "amqp:/_topo/0/" + node["name"] + "/$management"
                         if host:
@@ -233,7 +234,7 @@ class Manager(object):
 
                     elif section.type in sectionKeys:
                         role = section.entries.get('role')
-                        if role == 'inter-router':
+                        if role == 'inter-router' or role == "edge":
                             # we are processing an inter-router listener or connector: so create a link
                             port = section.entries.get('port', 'amqp')
                             if section.type == 'listener':
@@ -283,25 +284,42 @@ class Manager(object):
             s = nodes[link['source']]
             t = nodes[link['target']]
             # keep track of names so we can print them above the sections
-            if 'listen_from' not in s:
-                s['listen_from'] = []
-            if 'conn_to' not in t:
-                t['conn_to'] = []
-            if 'conns' not in t:
-                t['conns'] = []
+            if 'ilisten_from' not in s:
+                s['ilisten_from'] = []
+            if 'iconn_to' not in t:
+                t['iconn_to'] = []
+            if 'iconns' not in t:
+                t['iconns'] = []
+            if 'elisten_from' not in s:
+                s['elisten_from'] = []
+            if 'econn_to' not in t:
+                t['econn_to'] = []
+            if 'econns' not in t:
+                t['econns'] = []
 
             # make sure source node has a listener
             lport = listen_port
             lhost = s.get('host', default_host)
-            s['listen_from'].append(t['name'])
-            if 'listener' not in s:
-                s['listener'] = listen_port
-                listen_port += 1
-            else:
-                lport = s['listener']
+            if s['nodeType'] == 'edge' or t['nodeType'] == 'edge':
+                s['elisten_from'].append(t['name'])
+                if 'elistener' not in s:
+                    s['elistener'] = listen_port
+                    listen_port += 1
+                else:
+                    lport = s['elistener']
 
-            t['conns'].append({"port": lport, "host": lhost})
-            t['conn_to'].append(s['name'])
+                t['econns'].append({"port": lport, "host": lhost})
+                t['econn_to'].append(s['name'])
+            else:
+                s['ilisten_from'].append(t['name'])
+                if 'ilistener' not in s:
+                    s['ilistener'] = listen_port
+                    listen_port += 1
+                else:
+                    lport = s['ilistener']
+
+                t['iconns'].append({"port": lport, "host": lhost})
+                t['iconn_to'].append(s['name'])
 
     def PUBLISH(self, request, nodeIndex=None, deploy=False):
         nodes = request["nodes"]
@@ -335,7 +353,7 @@ class Manager(object):
 
         # now process all the routers
         for node in nodes:
-            if node['nodeType'] == 'inter-router':
+            if node['cls'] == 'router':
                 if self.verbose:
                     print "------------- processing node", node["name"], "---------------"
 
@@ -347,9 +365,11 @@ class Manager(object):
 
                 # add a router section in the config file
                 r = RouterSection(**node)
-                if not node.get('conns') and not node.get('listener'):
+                if not node.get('iconns') and not node.get('ilistener') and not node.get('econns') and not node.get('elistener'):
                     r.setEntry('mode', 'standalone')
-                else:
+                elif node['nodeType'] == 'edge':
+                    r.setEntry('mode', 'edge')
+                else: 
                     r.setEntry('mode', 'interior')
                 r.setEntry('id', node['name'])
                 if nodeIndex is None:
@@ -379,23 +399,37 @@ class Manager(object):
                                 print "attributes", o, "is written as", str(c(**o))
                             config_fp.write(str(c(**o)) + "\n")
 
-                if 'listener' in node:
-                    # always listen on localhost
-                    lhost = "0.0.0.0"
-                    listenerSection = ListenerSection(node['listener'], **{'host': lhost, 'role': 'inter-router'})
-                    if 'listen_from' in node and len(node['listen_from']) > 0:
-                        config_fp.write("\n# listener for connectors from " + ', '.join(node['listen_from']) + "\n")
+                lhost = "0.0.0.0"
+                if 'ilistener' in node:
+                    listenerSection = ListenerSection(node['ilistener'], **{'host': lhost, 'role': 'inter-router'})
+                    if 'ilisten_from' in node and len(node['ilisten_from']) > 0:
+                        config_fp.write("\n# listener for connectors from " + ', '.join(node['ilisten_from']) + "\n")
+                    config_fp.write(str(listenerSection) + "\n")
+                if 'elistener' in node:
+                    listenerSection = ListenerSection(node['elistener'], **{'host': lhost, 'role': 'edge'})
+                    if 'elisten_from' in node and len(node['elisten_from']) > 0:
+                        config_fp.write("\n# listener for connectors from " + ', '.join(node['elisten_from']) + "\n")
                     config_fp.write(str(listenerSection) + "\n")
 
-                if 'conns' in node:
-                    for idx, conns in enumerate(node['conns']):
+                if 'iconns' in node:
+                    for idx, conns in enumerate(node['iconns']):
                         conn_port = conns['port']
                         conn_host = conns['host']
                         if node.get('host') == conn_host:
                             conn_host = "0.0.0.0"
                         connectorSection = ConnectorSection(conn_port, **{'host': conn_host, 'role': 'inter-router'})
-                        if 'conn_to' in node and len(node['conn_to']) > idx:
-                            config_fp.write("\n# connect to " + node['conn_to'][idx] + "\n")
+                        if 'iconn_to' in node and len(node['iconn_to']) > idx:
+                            config_fp.write("\n# connect to " + node['iconn_to'][idx] + "\n")
+                        config_fp.write(str(connectorSection) + "\n")
+                if 'econns' in node:
+                    for idx, conns in enumerate(node['econns']):
+                        conn_port = conns['port']
+                        conn_host = conns['host']
+                        if node.get('host') == conn_host:
+                            conn_host = "0.0.0.0"
+                        connectorSection = ConnectorSection(conn_port, **{'host': conn_host, 'role': 'edge'})
+                        if 'econn_to' in node and len(node['econn_to']) > idx:
+                            config_fp.write("\n# connect to " + node['econn_to'][idx] + "\n")
                         config_fp.write(str(connectorSection) + "\n")
 
                 # return requested config file as string

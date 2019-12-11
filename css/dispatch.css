@@ -87,6 +87,13 @@ circle.node {
   stroke: darkgray;
 }
 
+circle.node.edge {
+    fill: #666666;
+    stroke: #000;
+    fill-opacity: 1;
+    stroke-width: 1;
+}
+
 circle.node.reflexive {
   stroke: #F00 !important;
   stroke-width: 2.5px;
@@ -103,9 +110,9 @@ circle.node.inter-router {
 }
 circle.node.normal {
     fill: #FFF;
-    stroke: #FFF;
-    fill-opacity: 0;
-    stroke-width: 0;
+    stroke: black;
+    fill-opacity: 1;
+    stroke-width: 1;
 }
 circle.node.on-demand {
     fill: #C0FFC0;

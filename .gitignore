@@ -1,2 +1,9 @@
 topologies/*
 !topologies/config-2/
+.history/
+.vscode/
+node_modules/
+*.pyc
+*.bak
+
+

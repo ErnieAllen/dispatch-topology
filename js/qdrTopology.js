@@ -75,7 +75,7 @@ var QDR = (function(QDR) {
       var doOperation = function (operation, callback, extraProps) {
         var l = []
         links.forEach( function (link) {
-          if (link.source.nodeType === 'inter-router' && link.target.nodeType === 'inter-router')
+          if (link.source.cls === 'router' && link.target.cls === 'router')
             l.push({source: link.source.index,
                     target: link.target.index,
                     cls: link.cls})
@@ -262,7 +262,7 @@ var QDR = (function(QDR) {
       var genNodeToAdd = function (contextNode, type, entityKey) {
         var id = contextNode.key
         var clients = nodes.filter ( function (node) {
-           return node.nodeType !== 'inter-router' && node.routerId === contextNode.name
+           return node.cls !== 'router' && node.routerId === contextNode.name
         })
         var clientLen = 0
         clients.forEach (function (client) {
@@ -360,7 +360,7 @@ var QDR = (function(QDR) {
       }
 
       var yoffset = 1; // toggles between 1 and -1. used to position new nodes
-      $scope.addAnotherNode = function (calc) {
+      $scope.addAnotherNode = function (calc, edge) {
         resetMouseVars();
         // add a new node
         var x = radiusNormal * 4;
@@ -396,10 +396,10 @@ var QDR = (function(QDR) {
           x = mouseX - offset.left + $(document).scrollLeft();
           y = mouseY - offset.top + $(document).scrollTop();;
         }
-        var name = genNewName()
+        var name = genNewName(edge)
         var nextId = nodes.length //maxNodeIndex() + 1
         var id = "amqp:/_topo/0/" + name + "/$management";
-        var node = aNode(id, name, "inter-router", 'router', nextId, x, y, undefined, false)
+        var node = aNode(id, name, edge ? "edge" : "inter-router", 'router', nextId, x, y, undefined, false)
         node.host = settings.default_host
         nodes.push(node);
         $scope.selected_node = node
@@ -419,15 +419,19 @@ var QDR = (function(QDR) {
       }
 
       // generate unique name for router and containerName
-      var genNewName = function() {
+      var genNewName = function(edge) {
         var re = /./g;
         for (var i=0, newName = '', found = true; found; ++i) {
-          newName = i.toString(26).replace(re, function (m) {
-            var ccode = m.charCodeAt(0)
-            if (ccode >= 48 && ccode <= 57)
-              return String.fromCharCode(ccode+17)
-            return String.fromCharCode(ccode-22)
-          })
+          if (edge) {
+            newName = 'E' + i;
+          } else {
+            newName = i.toString(26).replace(re, function (m) {
+              var ccode = m.charCodeAt(0)
+              if (ccode >= 48 && ccode <= 57)
+                return String.fromCharCode(ccode+17)
+              return String.fromCharCode(ccode-22)
+            })
+          }
           found = nodes.some( function (n) {return n.name === newName})
         }
         return newName
@@ -540,9 +544,11 @@ var QDR = (function(QDR) {
         'normal': 15,
         'on-demand': 15,
         'route-container': 15,
-        'host': 20
+        'host': 20,
+        'edge': 25
       };
       var radius = 25;
+      var radiusEdge = 20;
       var radiusNormal = 15;
       var svg, lsvg;
       var force;
@@ -1023,6 +1029,7 @@ var QDR = (function(QDR) {
           .classed('client', function(d) {
             return d.nodeType === 'normal' && !d.properties.console_identifier
           })
+          .classed('edge', d => d.nodeType === 'edge')
       }
 
       var appendContent = function(g) {
@@ -1238,7 +1245,6 @@ var QDR = (function(QDR) {
           .on('mouseup', function(d) {  // mouse up for circle
             if (!mousedown_node)
               return;
-
             selected_link = null;
             // unenlarge target node
             d3.select(this).attr('transform', '');
@@ -1257,16 +1263,18 @@ var QDR = (function(QDR) {
             }
             // we want a link between the selected_node and this node
             if ($scope.selected_node && d !== $scope.selected_node) {
-              if (d.nodeType !== 'inter-router')
+              if (d.cls !== 'router')
                 return;
 
               // add a link from the clicked node to the selected node
               var source = nodes.findIndex( function (n) {
-                return (n.key === d.key && n.nodeType === 'inter-router')
+                return (n.key === d.key && n.cls === 'router')
               })
               var target = nodes.findIndex( function (n) {
-                return (n.key === $scope.selected_node.key && n.nodeType === 'inter-router')
+                return (n.key === $scope.selected_node.key && n.cls === 'router')
               })
+              if (nodes[source].nodeType === "edge" && nodes[target].nodeType === "edge")
+                return;
               var curLinkCount = links.length
               var newIndex = getLink(source, target, "in", "", genLinkName(d, $scope.selected_node));
               // there was already a link from selected to clicked node
@@ -1301,7 +1309,7 @@ var QDR = (function(QDR) {
             $scope.selected_node = d;
             if (!$scope.$$phase) $scope.$apply() // we just changed a scope variable during an async event
             var rm = relativeMouse()
-            var menu = d.nodeType === 'inter-router' ? 'action_menu' : 'client_context_menu'
+            var menu = d.cls === 'router' ? 'action_menu' : 'client_context_menu'
             if (isSelectedNode(d))
               menu = 'multiple_action_menu'
             d3.select('#'+menu)
@@ -1544,7 +1552,7 @@ var QDR = (function(QDR) {
         var sel = d3.selectAll('circle.node')
         for (var i=0; i<10; i++) {
           sel.classed('host'+i, function (d) {
-            return i === getHostIndex(d.host) && (d.cls === 'router' || d.cls === 'host')
+            return d.nodeType === 'inter-router' && i === getHostIndex(d.host) && (d.cls === 'router' || d.cls === 'host')
           })
         }
       }
