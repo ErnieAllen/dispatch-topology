@@ -23,7 +23,7 @@
     "d3": "^3.5.17",
     "font-awesome": "^4.7.0",
     "html5shiv": "^3.7.3",
-    "jquery": "^3.4.1",
+    "jquery": "^3.5.0",
     "jquery-ui-dist": "^1.12.1",
     "jquery-ui-themes": "^1.12.0",
     "notifyjs-browser": "^0.4.2",
