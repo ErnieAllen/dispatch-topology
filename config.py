@@ -88,7 +88,7 @@ class DirectoryConfigs(object):
         try:
             c = get_class(cname)
             return c(**s[1])
-        except KeyError, e:
+        except KeyError as e:
             return None
 
 class Manager(object):
@@ -105,15 +105,15 @@ class Manager(object):
         try:
             method = getattr(self, m)
         except AttributeError:
-            print op + " is not implemented yet"
+            print (op + " is not implemented yet")
             return None
         if self.verbose:
-            print "Got request " + op
+            print ("Got request " + op)
         return method(request)
 
     def ANSIBLE_INSTALLED(self, request):
         if self.verbose:
-            print "Ansible is", "installed" if find_executable("ansible") else "not installed"
+            print ("Ansible is", "installed") if find_executable("ansible") else "not installed"
         return "installed" if find_executable("ansible") else ""
 
     # if the node has listeners, and one of them has an http:'true'
@@ -177,7 +177,7 @@ class Manager(object):
         def ansible_done(returncode):
             os.remove(inventory_file)
             if self.verbose:
-                print "-------------- DEPLOYMENT DONE with return code", returncode, "------------"
+                print ("-------------- DEPLOYMENT DONE with return code", returncode, "------------")
             if returncode:
                 self.state = returncode
             else:
@@ -335,7 +335,7 @@ class Manager(object):
 
         if self.verbose:
             if nodeIndex is not None:
-                print("Creating config for " + topology + " node " + nodes[nodeIndex]['name'])
+                print ("Creating config for " + topology + " node " + nodes[nodeIndex]['name'])
             elif deploy:
                 print("DEPLOYing to " + topology)
             else:
@@ -345,7 +345,7 @@ class Manager(object):
             # remove all .conf files from the output dir. they will be recreated below possibly under new names
             for f in glob(self.topo_base + topology + "/*.conf"):
                 if self.verbose:
-                    print "Removing", f
+                    print ("Removing", f)
                 os.remove(f)
 
         # establish connections and listeners for each node based on links
@@ -355,7 +355,7 @@ class Manager(object):
         for node in nodes:
             if node['cls'] == 'router':
                 if self.verbose:
-                    print "------------- processing node", node["name"], "---------------"
+                    print ("------------- processing node", node["name"], "---------------")
 
                 nname = node["name"]
                 if nodeIndex is not None:
@@ -380,14 +380,14 @@ class Manager(object):
                 for sectionKey in sectionKeys:
                     if sectionKey+'s' in node:
                         if self.verbose:
-                            print "found", sectionKey+'s'
+                            print ("found", sectionKey+'s')
                         for k in node[sectionKey+'s']:
                             if self.verbose:
-                                print "processing", k
+                                print ("processing", k)
                             o = node[sectionKey+'s'][k]
                             cname = sectionKey[0].upper() + sectionKey[1:] + "Section"
                             if self.verbose:
-                                print "class name is", cname
+                                print ("class name is", cname)
                             c = get_class(cname)
                             if sectionKey == "listener" and o['port'] != 'amqp' and int(o['port']) == http_port:
                                 config_fp.write("\n# Listener for a console\n")
@@ -396,7 +396,7 @@ class Manager(object):
                             if node.get('host') == o.get('host'):
                                 o['host'] = '0.0.0.0'
                             if self.verbose:
-                                print "attributes", o, "is written as", str(c(**o))
+                                print ("attributes", o, "is written as", str(c(**o)))
                             config_fp.write(str(c(**o)) + "\n")
 
                 lhost = "0.0.0.0"
@@ -485,7 +485,7 @@ args = parser.parse_args()
 
 try:
     httpd = ConfigTCPServer(args.port, Manager(args.topology, args.verbose), args.verbose)
-    print "serving at port", args.port
+    print ("serving at port", args.port)
     httpd.serve_forever()
 except KeyboardInterrupt:
     pass
