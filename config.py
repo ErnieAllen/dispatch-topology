@@ -20,19 +20,22 @@
 
 import argparse
 from pprint import pprint
-import os, sys, inspect
+import os, sys, inspect, traceback
 import string
 import random
 from glob import glob
-from mock import *
-import SimpleHTTPServer
-import SocketServer
-import json
-import cStringIO
+from mock.section import RouterSection, ListenerSection, ConnectorSection
+from mock.schema import Schema
+import http.server
+import socketserver
+
+import json, re
+import io
 import yaml
 import threading
 import subprocess
 from distutils.spawn import find_executable
+from builtins import str
 import pdb;
 
 get_class = lambda x: globals()[x]
@@ -220,12 +223,16 @@ class Manager(object):
             node = {}
             for sect in configs[file]:
                 # remove notes to self
-                host = sect[1].pop('deploy_host', None)
+                #pdb.set_trace()
+                host = sect[1].get('deploy_host', None)
+                if host:
+                    del sect[1]['deploy_host']
+                #host = sect[1].pop('deploy_host', None)
                 section = dc.asSection(sect)
                 if section:
                     if section.type == "router":
                         node["index"] = index
-                        node["nodeType"] = "edge" if section.entries["mode"] == "edge" else unicode("inter-router")
+                        node["nodeType"] = "edge" if section.entries["mode"] == "edge" else str("inter-router")
                         node["name"] = section.entries["id"]
                         node["key"] = "amqp:/_topo/0/" + node["name"] + "/$management"
                         if host:
@@ -256,17 +263,17 @@ class Manager(object):
             for listener_port in ports_for_this_routers['listeners']:
                 for target, ports_for_other_routers in enumerate(port_map):
                     if listener_port in ports_for_other_routers['connectors']:
-                        links.append({'source': source, 'target': target, 'dir': unicode("in")})
+                        links.append({'source': source, 'target': target, 'dir': str("in")})
 
         return {"nodes": nodes, "links": links, "topology": topology}
 
     def GET_TOPOLOGY(self, request):
         if self.verbose:
             pprint (self.topology)
-        return unicode(self.topology)
+        return str(self.topology)
 
     def GET_TOPOLOGY_LIST(self, request):
-        return [unicode(f) for f in os.listdir(self.topo_base) if os.path.isdir(self.topo_base + f)]
+        return [str(f) for f in os.listdir(self.topo_base) if os.path.isdir(self.topo_base + f)]
 
     def SWITCH(self, request):
         self.topology = request["topology"]
@@ -359,12 +366,14 @@ class Manager(object):
 
                 nname = node["name"]
                 if nodeIndex is not None:
-                    config_fp = cStringIO.StringIO()
+                    config_fp = io.StringIO()
                 else:
                     config_fp = open(self.topo_base + topology + "/" + nname + ".conf", "w+")
 
                 # add a router section in the config file
                 r = RouterSection(**node)
+                if nodeIndex is None:
+                    r.setEntry('deploy_host', node.get('host', ''))
                 if not node.get('iconns') and not node.get('ilistener') and not node.get('econns') and not node.get('elistener'):
                     r.setEntry('mode', 'standalone')
                 elif node['nodeType'] == 'edge':
@@ -372,8 +381,6 @@ class Manager(object):
                 else: 
                     r.setEntry('mode', 'interior')
                 r.setEntry('id', node['name'])
-                if nodeIndex is None:
-                    r.setEntry('deploy_host', node.get('host', ''))
                 config_fp.write(str(r) + "\n")
 
                 # write other sections
@@ -442,37 +449,50 @@ class Manager(object):
 
         return "published"
 
-class HttpHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class HttpHandler(http.server.SimpleHTTPRequestHandler):
     # use GET requests to serve the web pages
     def do_GET(self):
-        SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self);
+        http.server.SimpleHTTPRequestHandler.do_GET(self);
+
+    def getheader(self, key, default):
+        headers = self.headers._headers
+        for (name, value) in headers:
+            if name == key:
+                return value
+        return default
 
     # use POST requests to send commands
     def do_POST(self):
-        content_len = int(self.headers.getheader('content-length', 0))
+        content_len = int(self.headers.get("Content-Length"), 0)
         if content_len > 0:
             body = self.rfile.read(content_len)
             self.log_message(str(body));
             data = json.loads(body)
-            response = self.server.manager.operation(data['operation'], data)
-            if response is not None:
-                self.send_response(200)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
+            try:
+                response = self.server.manager.operation(data['operation'], data)
+                if response is not None:
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    #self.send_header("Content-Length", len(response))
+                    self.end_headers()
 
-                self.wfile.write(json.dumps(response));
-                self.wfile.close();
+                    self.wfile.write(json.dumps(response).encode('utf-8'))
+                    self.wfile.flush();
+                    print (json.dumps(response).encode('utf-8'))
+                    #self.wfile.close()
+            except Exception:
+                self.send_error(500, traceback.format_exc())
         else:
-            return SimpleHTTPServer.SimpleHTTPRequestHandler.do_POST(self)
+            return self.do_POST()
 
     # only log if verbose was requested
     def log_request(self, code='-', size='-'):
         if self.server.verbose:
             self.log_message('"%s" %s %s', self.requestline, str(code), str(size))
 
-class ConfigTCPServer(SocketServer.TCPServer):
+class ConfigTCPServer(socketserver.TCPServer):
     def __init__(self, port, manager, verbose):
-        SocketServer.TCPServer.__init__(self, ("", port), HttpHandler)
+        socketserver.TCPServer.__init__(self, ("", port), HttpHandler)
         self.manager = manager
         self.verbose = verbose
 

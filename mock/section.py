@@ -19,7 +19,7 @@
 
 import json
 import re
-from schema import Schema
+from . schema import Schema
 import pdb
 
 class ConfigSection(object):
@@ -51,15 +51,16 @@ class ConfigSection(object):
 
     def __repr__(self):
         # ensure all entries have values
-        self.entries = {k: v for k, v in self.entries.iteritems() if self.entries.get(k)}
+        self.entries = {k: v for k, v in self.entries.items() if self.entries.get(k)}
         raw = self.type + " " + json.dumps(self.entries, indent=4, separators=('', ': '))
         return re.sub('["]', '', raw)
 
 class RouterSection(ConfigSection):
     defaults = {"mode": "interior"}
     ignore = ["type", "routerId", "identity", "name"]
+    forced = ["mode"]
     def __init__(self, id, **kwargs):
-        super(RouterSection, self).__init__("router", RouterSection.defaults, RouterSection.ignore, [], kwargs)
+        super(RouterSection, self).__init__("router", RouterSection.defaults, RouterSection.ignore, RouterSection.forced, kwargs)
         self.setEntry("id", id)
 
     def __repr__(self):
@@ -103,9 +104,9 @@ if __name__ == '__main__':
     c = ConnectorSection(20001)
     s = SslProfileSection()
     g = LogSection(module="ROUTER", enable="trace+")
-    print r
-    print l
-    print c
-    print s
-    print g
+    print (r)
+    print (l)
+    print (c)
+    print (s)
+    print (g)
 

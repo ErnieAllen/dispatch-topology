@@ -19,7 +19,7 @@ Licensed to the Apache Software Foundation (ASF) under one
 /**
  * @module QDR
  */
-var QDR = (function(QDR) {
+var QDR = (function (QDR) {
   // The QDR service handles the connection to
   // the server in the background
   QDR.module.factory("QDRService", [
@@ -28,18 +28,18 @@ var QDR = (function(QDR) {
     "$timeout",
     "$resource",
     "$location",
-    function($rootScope, $http, $timeout, $resource, $location) {
+    function ($rootScope, $http, $timeout, $resource, $location) {
       var self = {
         connectActions: [],
         schema: undefined,
 
-        addConnectAction: function(action) {
+        addConnectAction: function (action) {
           if (angular.isFunction(action)) {
             self.connectActions.push(action);
           }
         },
-        executeConnectActions: function() {
-          self.connectActions.forEach(function(action) {
+        executeConnectActions: function () {
+          self.connectActions.forEach(function (action) {
             try {
               action.apply();
             } catch (e) {
@@ -49,24 +49,24 @@ var QDR = (function(QDR) {
           });
           self.connectActions = [];
         },
-        nameFromId: function(id) {
+        nameFromId: function (id) {
           return id.split("/")[3];
         },
 
-        humanify: function(s) {
+        humanify: function (s) {
           if (!s || s.length === 0) return s;
           var t =
             s.charAt(0).toUpperCase() + s.substr(1).replace(/[A-Z]/g, " $&");
           return t.replace(".", " ");
         },
-        pretty: function(v) {
+        pretty: function (v) {
           var formatComma = d3.format(",");
           if (!isNaN(parseFloat(v)) && isFinite(v)) return formatComma(v);
           return v;
         },
 
         // given an attribute name array, find the value at the same index in the values array
-        valFor: function(aAr, vAr, key) {
+        valFor: function (aAr, vAr, key) {
           var idx = aAr.indexOf(key);
           if (idx > -1 && idx < vAr.length) {
             return vAr[idx];
@@ -74,29 +74,30 @@ var QDR = (function(QDR) {
           return null;
         },
 
-        isArtemis: function(d) {
+        isArtemis: function (d) {
           return (
             d.nodeType === "route-container" &&
             d.properties.product === "apache-activemq-artemis"
           );
         },
 
-        isQpid: function(d) {
+        isQpid: function (d) {
           return (
             d.nodeType === "route-container" &&
-            (d.properties && d.properties.product === "qpid-cpp")
+            d.properties &&
+            d.properties.product === "qpid-cpp"
           );
         },
 
-        isAConsole: function(properties, connectionId, nodeType, key) {
+        isAConsole: function (properties, connectionId, nodeType, key) {
           return self.isConsole({
             properties: properties,
             connectionId: connectionId,
             nodeType: nodeType,
-            key: key
+            key: key,
           });
         },
-        isConsole: function(d) {
+        isConsole: function (d) {
           // use connection properties if available
           return (
             d &&
@@ -105,15 +106,15 @@ var QDR = (function(QDR) {
           );
         },
 
-        flatten: function(attributes, result) {
+        flatten: function (attributes, result) {
           var flat = {};
-          attributes.forEach(function(attr, i) {
+          attributes.forEach(function (attr, i) {
             if (result && result.length > i) flat[attr] = result[i];
           });
           return flat;
         },
-        getSchema: function(callback) {
-          self.sendMethod("GET-SCHEMA", {}, function(response) {
+        getSchema: function (callback) {
+          self.sendMethod("GET-SCHEMA", {}, function (response) {
             for (var entityName in response.entityTypes) {
               var entity = response.entityTypes[entityName];
               if (entity.deprecated) {
@@ -134,33 +135,59 @@ var QDR = (function(QDR) {
           });
         },
 
-        sendMethod: function(operation, props, callback) {
-          setTimeout(function() {
+        sendMethod: function (operation, props, callback) {
+          setTimeout(function () {
             props["operation"] = operation;
             let host = window.location.hostname;
             let port = window.location.port;
             let to = `http://${host}:${port}`;
-            console.log(`sending POST to ${to} for operation ${operation}`);
+            console.log(
+              `sending POST to ${to} for operation ${operation} for props ${JSON.stringify(
+                props,
+                null,
+                2
+              )}`
+            );
+            /*
+            $http.post(to, JSON.stringify(props)).then(
+              function (response) {
+                console.log("success");
+                console.log(response);
+
+                // This function handles success
+              },
+              function (response) {
+                console.log("error");
+                console.log(response);
+
+                // this function handles error
+              }
+            );
+            */
             $.post(
               to,
               JSON.stringify(props),
-              function(response, status) {
+              function (response, status) {
+                console.log(
+                  `sendMethod called ${operation} and got a status of ${status} and response of`
+                );
+                console.log(response);
                 callback(response);
               },
               "json"
             );
           }, 1);
-        }
+        },
       };
       return self;
-    }
+    },
   ]);
 
   return QDR;
 })(QDR || {});
 
-(function() {
-  console.dump = function(o) {
+(function () {
+  console.dump = function (o) {
     if (window.JSON && window.JSON.stringify)
       QDR.log.info(JSON.stringify(o, undefined, 2));
     else console.log(o);
@@ -168,13 +195,13 @@ var QDR = (function(QDR) {
 })();
 
 if (!String.prototype.startsWith) {
-  String.prototype.startsWith = function(searchString, position) {
+  String.prototype.startsWith = function (searchString, position) {
     return this.substr(position || 0, searchString.length) === searchString;
   };
 }
 
 if (!String.prototype.endsWith) {
-  String.prototype.endsWith = function(searchString, position) {
+  String.prototype.endsWith = function (searchString, position) {
     var subjectString = this.toString();
     if (
       typeof position !== "number" ||
@@ -219,12 +246,12 @@ if (typeof Object.assign != "function") {
       return to;
     },
     writable: true,
-    configurable: true
+    configurable: true,
   });
 }
 
 if (!String.prototype.repeat) {
-  String.prototype.repeat = function(count) {
+  String.prototype.repeat = function (count) {
     "use strict";
     if (this == null) {
       throw new TypeError("can't convert " + this + " to object");
@@ -261,7 +288,7 @@ if (!String.prototype.repeat) {
 }
 
 if (!Array.prototype.move) {
-  Array.prototype.move = function(from, to) {
+  Array.prototype.move = function (from, to) {
     this.splice(to, 0, this.splice(from, 1)[0]);
   };
 }
@@ -269,7 +296,7 @@ if (!Array.prototype.move) {
 // https://tc39.github.io/ecma262/#sec-array.prototype.findIndex
 if (!Array.prototype.findIndex) {
   Object.defineProperty(Array.prototype, "findIndex", {
-    value: function(predicate) {
+    value: function (predicate) {
       // 1. Let O be ? ToObject(this value).
       if (this == null) {
         throw new TypeError('"this" is null or not defined');
@@ -307,6 +334,6 @@ if (!Array.prototype.findIndex) {
 
       // 7. Return -1.
       return -1;
-    }
+    },
   });
 }

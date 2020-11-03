@@ -17,7 +17,5 @@
 # under the License
 #
 
-from section import *
-from schema import Schema
-
-
+#from section import *
+#from schema import Schema
